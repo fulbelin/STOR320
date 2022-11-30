@@ -1,7 +1,7 @@
 # STOR320
 STOR 320 is an introduction to data science course offered to the students at UNC Chapel Hill. This repository includes the explotary data analysis and the final project report that was done as a project for the STOR320 class.
 
-##INTRODUCTION
+## INTRODUCTION
 
 The National Basketball Association (NBA) is one of the most popular sports leagues across the globe, and most definitely the biggest basketball league at that. Today’s game of basketball continues to evolve every year in terms of gameplay, strategy, and the characteristics of the players themselves. In this project, two questions, in particular, will help evaluate this evolution.
 
