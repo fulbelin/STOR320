@@ -1,0 +1,374 @@
+---
+title: "Final Paper"
+author: "STOR 320.01 Group 5"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xtable)
+library(tinytex)
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(reactable)
+library(reactR)
+library(reactablefmtr)
+library(shinythemes)
+library(dplyr)
+library(car)
+```
+
+```{r, include=FALSE}
+all_lineups <- read_csv("AllLineupsFrom04To22.csv")
+all_playoff_lineups <- read_csv("AllPlayoffLineupsFrom04To22.csv")
+all_reg_lineups <- read_csv("AllRegSeasonLineupsFrom04To22.csv")
+all_players <- read_csv("TotalPlayersFrom04To22.csv")
+all_players_with_dups <- read_csv("EachYearPlayersFrom04To22.csv")
+
+# Put into beginnings doc later, removes % signs
+all_lineups <- lapply(all_lineups, gsub, pattern='%', replacement='') %>%
+  as_tibble() %>%
+  type.convert(as.is = TRUE)
+all_lineups$Year <- as.character(all_lineups$Year)
+all_playoff_lineups <- as.data.frame(lapply(all_playoff_lineups, gsub, pattern='%', replacement='')) %>%
+  as_tibble() %>%
+  type.convert(as.is = TRUE)
+all_playoff_lineups$Year <- as.character(all_playoff_lineups$Year)
+all_reg_lineups <- as.data.frame(lapply(all_reg_lineups, gsub, pattern='%', replacement='')) %>%
+  as_tibble() %>%
+  type.convert(as.is = TRUE)
+all_reg_lineups$Year <- as.character(all_reg_lineups$Year)
+```
+
+```{r, echo=FALSE}
+# Necessary stuff to be coded, add into r setup chunk at top
+all_reg_lineups_minus_averages = filter(all_reg_lineups, Team != "League Averages")
+
+all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),21] = 78
+all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),41] = all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),41] = (all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),5] + all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),13] + all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),21] + all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),29] + all_reg_lineups_minus_averages[which(is.na(all_reg_lineups$Average.Height) == T),37])/5
+```
+
+# INTRODUCTION
+
+The National Basketball Association (NBA) is one of the most popular sports leagues across the globe, and most definitely the biggest basketball league at that. Today's game of basketball continues to evolve every year in terms of gameplay, strategy, and the characteristics of the players themselves. In this project, two questions, in particular, will help evaluate this evolution.
+
+Point differential is arguably the greatest statistic to determine how well a certain lineup performs. After all, the goal of basketball is to outscore your opponent, therefore it is logical to assume that exhibiting a positive point differential plays a pivotal role in determining whether a team wins or loses. With that being said, which variables can accurately predict a lineup's point differential? To answer this, we will create the best model with the techniques that we have learned to accurately predict a lineup's point differential. With a reliable model, NBA statisticians, coaches, and general managers would be able to understand what changes are needed within their teams to improve their point differentials and therefore win more games, something that all basketball fans can benefit from.
+
+In addition to point differential, the newly found prevalence of international players in today's version of the NBA caught our eyes as a group. We wanted to know how have international players become more utilized in recent NBA history. More specifically, are they more present in later-used lineups? Do the most used lineups have international players? The significance of these questions can best be seen in the 21st century, as international players have not only increased their population in the NBA but have also played major roles within their organizations. For example, the past four Most Valuable Player awards have gone to international-born players, forcing scouts to broaden their horizons beyond just the NCAA, but overseas as well. By answering these questions, one can better understand the impact of international players on the NBA, and get an idea of why scouts are as intrigued as they are by top international prospects, such as 19-year-old, Victor Wembanyama, who is the biggest draft prospect since Lebron James himself.
+
+With these two questions answered, we would be able to have a stronger understanding of how a team can improve their point differentials (which could lead to more wins, hence better fan approval) and the level of importance that international-born players have in today's NBA.
+
+# DATA
+
+Our dataset was scraped from the popular basketball data-sourcing website Cleaning The Glass. This website was created by Ben Falk, a notable statistician and data scientist who previously worked with several NBA teams. The data itself was collected by sportradar, which is renowned for its large databases of major sports. For this project, we used the data present on lineups, which can be found here. This lineup data is available for every year of NBA basketball since 2004 and includes several divisions of basketball statistics including efficiency differential (points scored per offensive possession - points allowed per defensive possession), shooting efficiency, shooting locations, halfcourt offense, transition/fastbreaks, and more -- for both offense and defense. As for the observations in our dataset, each row represents a single lineup that played at least 100 possessions. In total, there are 6,284 lineups since 2004 that met this requirement. Cleaning The Glass includes the names of all 5 players in the lineup, but doesn’t include any biographical information about them (which we need for our question of international representation). To remedy this, we scraped the players’ biographical information from NBA.com and ran a match function to combine the two datasets. Once we accomplished this, our dataset looked as follows:
+
+```{r, warning=FALSE, echo=FALSE}
+# First table in introduction
+t1 = head(all_reg_lineups_minus_averages)[,c(4, 45, 47, 49, 51)]
+reactable(t1, striped = TRUE, highlight = TRUE, theme = fivethirtyeight())
+# Second table in introduction
+t2 = head(all_reg_lineups_minus_averages)[,4:11]
+reactable(t2, striped = TRUE, highlight = TRUE, theme = fivethirtyeight())
+# Visualization for point differential vs. 3 point %
+ggplot(data = all_reg_lineups_minus_averages, aes(x = `OFFENSE..All.Three.FG.`, y = Diff)) +
+  geom_point() +
+  xlab("Lineup 3 Point Percentage") +
+  ylab("Efficiency Differential")
+```
+
+ 
+For our question of international representation, we used the player’s nationality, the number of lineups with international players played, the years of said lineups, and the number of played possessions of lineups with international players. For players who have two countries listed under nationality, the first country is their birth country and the second is their assumed nationality if they grew up in a different location. The impact of these specific values will be further discussed in the analysis of international players. 
+For our question of predictors for a lineup’s point/efficiency differential, it was much more difficult to establish a limited number of variables of interest. We were looking to work backwards and eliminate many of the variables when creating a model. However, we were aware some variables were pointless to include, even in a full model. So, before building this model, we eliminated several variables such as player name, team, draft year, and nationality. We kept all other variables. Some of the most important efficiency statistics included effective field goal percentage (a general metric for shooting percentage), points scored per possession, percentage of plays a turnover occurred, and free throw percentage, along with shooting percentages for every area of the court.
+GGplot of one variable vs. point differential
+
+
+
+# RESULTS
+
+In the NBA statistics community, efficiency differential is commonly used to determine the prevalence of a lineup. As opposed to simple point differential (subtracting number of points allowed from number of points scored), efficiency differential subtracts the number of points allowed per 100 possessions from the points scored per 100 possessions. Our goal was to create a model that would help predict this value from the lineup data we collected.
+	To begin, we created a full model using all variables except those mentioned previously in the paper (name, team, etc. -- variables bearing no supposed impact on predictions).
+
+```{r, include=FALSE}
+# First full model
+fulldata <- subset(all_reg_lineups_minus_averages, select = -c(1, Year, Team, PG, SG, SF, PF, C, 9, 17, 25, 33, 42, 11, 19, 27, 35, 44))
+Full <- lm(Diff~., fulldata)
+```
+
+
+Barely any coefficients in this model were significant at the 0.05 alpha level, which meant a full model was nowhere close to being an acceptable predictor for efficiency differential. In addition, when we look at the residual vs. fitted plot and normality plot for this full model, severe concerns are present. Both equal variance and normality can absolutely NOT be assumed. 
+
+```{r, echo=FALSE}
+plot(Full, 1:2)
+```
+
+
+Before using a model selection method,  we looked to continue eliminating variables on our own. At this stage, we wanted to remove variables from our full model that lacked any amount of interpretability as a predictor for efficiency differential. We felt these variables were useful for retrospective knowledge, but not for predicting a lineup’s future performance. These included total games played in the season by each individual player, number of possessions played by each lineup, and the percentile rank against all other lineups in each statistical category.
+Next, we looked to eliminate variables that caused general multicollinearity. The biggest offender of collinearity was the player height variables. Since we also had an average height variable, there was 100% multicollinearity between them which prevented us from even viewing the VIF values from the full model. Additionally, we decided to remove the age variable for each player because we felt experience did a significant job explaining a player’s length of time in the NBA. Thus, we removed the player’s heights and kept average height in the data set. Next, we noticed that the relative frequency of shots variables had extremely high VIF values (as can be seen below this paragraph). Since each lineup’s relative frequency totaled 100, there was bound to be collinearity between each individual frequency value. So, we decided to remove all frequencies except rim frequency and three-point frequency. By doing so, our issues with multicollinearity of shot locations were resolved. Thus, we were able to create a second “full model, which was much more condensed and had no major issues with collinearity, as can be seen in the summary/VIF below.
+
+
+```{r, echo=FALSE}
+# Second full model
+fulldata2 <- subset(all_reg_lineups_minus_averages, select = -c(1, Year, Team, PG, SG, SF, PF, C, 9, 17, 25, 33, 42, 11, 19, 27, 35, 44, 5, 13, 21, 29, 37))
+Full2 <- lm(Diff~., fulldata2)
+# Summary table of second full model
+summary(Full2)
+# VIF of second full model
+vif(Full2)
+```
+
+
+Now with a more precise full model, we believed we could begin to use stepwise regression to narrow down our predictors. Once doing so, we developed a model where only three predictors were insignificant at the 95% confidence level. As evidenced below, the summary statistics proved that this new model was very effective in explaining the level of efficiency differential a lineup exhibited, as the adjusted r-square value was strong .9698, meaning that almost 97% differences in efficiency differentials can be explained by the predictors within the model. Additionally, both the residuals vs. fitted and normality plots had been improved significantly, further proving the superiority of this model in comparison to the model plagued by multicollinearity. After creating our final model, we ran an ANOVA test to understand which covariates were most influential in explaining efficiency differential. Through the test, it was clear that a lineup’s offensive points per possession, defensive effective field goal percentage, defensive turnover rate, defensive offensive rebound allowed, and its point guard’s experience level were the most instrumental in determining the lineup’s efficiency differential.
+
+```{r, echo=FALSE}
+# Stepwise, final model
+modeldata <- subset(all_reg_lineups_minus_averages, select = -c(1, Year, Team, PG, SG, SF, PF, C, 5, 6, 8, 9, 11, 13, 14, 16, 17, 19, 21, 22, 24, 25, 27, 29, 30, 32, 33, 35, 37, 38, 42, 44, 45, 46, 48, 50, 52, 54, 56, 58, 59, 60, 62, 64, 66, 68, 70, 71, 72, 73, 74, 75, 76, 78, 79, 80, 82, 84, 86, 88, 89, 90, 92, 94, 95, 96, 98, 100, 102, 104, 106, 108, 110, 111, 112, 114, 115, 116, 118, 119, 120, 122, 124, 126, 128, 129, 130, 132, 134, 135, 136, 138, 140, 142, 144, 146))
+model1 <- lm(Diff~., modeldata)
+model2 <- lm(Diff~., model1$model)
+model <- step(model2, trace = FALSE)
+# Summary of final model
+summary(model)
+# VIF of final model
+vif(model)
+```
+
+```{r, echo=FALSE}
+# Plots for final model
+plot(model)
+```
+
+```{r, echo=FALSE}
+# ANOVA for final model
+anova(model)
+```
+
+Through the final model created, it is clear that besides the experience level of a lineup’s point guard, the efficiency differential can best be explained through various basketball analytical metrics pertaining to both offense and defense. Although someone who has little knowledge of basketball may wonder why point guard experience is relevant, it makes sense that this variable is included, as the point guard can best be described as a coach on the court, as they frequently call plays and is a position best known for their playmaking abilities, therefore it is logical that as a point guard’s experience is increased, their knowledge of the game and veteran leadership would lead to a higher efficiency differential. It is clear that the predictors of this model explain a vast proportion efficiency differential, as its adjusted r-squared value is an astounding .9698. For anyone wondering how to explain a particular lineup’s efficiency differential, these variables are paramount, as evidenced by their significance levels, and can be a reliable way to understand why certain lineups underperform in comparison to other ones based on the metrics implemented in the model.
+
+
+```{r, echo=FALSE}
+foreign_players <- subset(all_players, Nationality != "United States")
+foreign_players_with_dups <- subset(all_players_with_dups, Nationality != "United States")
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align='center'}
+for(i in 1:nrow(all_players_with_dups)) {
+  if (all_players_with_dups$Nationality[i] == "United States") {
+  all_players_with_dups$US[i] = "Y"
+  } else
+  if (all_players_with_dups$Nationality[i] != "United States") {
+  all_players_with_dups$US[i] = "N"
+  }
+}
+
+ggplot(all_players_with_dups, aes(x = Year, fill = US), order = -as.numeric(y)) + 
+  geom_bar(stat = "count", position = "fill", show.legend = TRUE) +
+  labs(title = "Proportion of Players US Born", y = "Proportion") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Here we can the proportion of players of each year who have an exclusive nationality of "United States", represented by the blue. It has a discernible trend of decreasing as time has passed, from the mid-80s to around 75% today. However, this only give us proportional data, not the underlying origins of the foreign players contributing to this trend. To analyze this an interact-able table has been produced to allow for searching of individual countries or frequencies.
+
+```{r, echo=FALSE}
+ForNations = plyr::count(foreign_players, 'Nationality')
+
+reactable(ForNations, striped = TRUE, highlight = TRUE, fullWidth = TRUE, columns = list(Nationality = colDef(minWidth = 150), freq = colDef(minWidth = 50, format = colFormat())), theme = nytimes(), paginationType = "jump", defaultSorted = list(freq = "desc"), filterable = TRUE)
+#when there is two countries birth one is first then legal nationality
+#Nigerian nationality is typically obtained under the principal of jus sanguinis, i.e. by birth to parents with Nigerian nationality. It can be granted to persons with an affiliation to the country, or to a permanent resident who has lived in the country for a given period of time through naturalization.
+#German and Greek citizenship are the same
+```
+This table gives us a number for the quantity of unique players from foreign countries, by country, over the past two decades. One can see that Canada and France are well ahead of the next closest countries with 34 and 32 players making it to the NBA respectively. Next closest are all in the teens, where one can see the row for "United StatesNigeria," which is a distinct form of nationality in our data. This occurs when a player is born in one country but has a legal nationality of another. This particular case represents the number of players born in the United States but to Nigerian parents. Certain countries like Nigeria, Germany, and Greece have citizenship established under the principal of jus sanguinis, i.e. by birth to parents with that nationality. It can still be granted to persons with an affiliation to the country, or to a permanent resident who has lived in the country for a given period of time through naturalization. The distinct row here shows how prevalent US born players of Nigerian descent are in the NBA today.
+
+```{r, echo=FALSE}
+Canada = subset(foreign_players_with_dups, Nationality == "Canada")
+France = subset(foreign_players_with_dups, Nationality == "France")
+Serbia = subset(foreign_players_with_dups, Nationality == "Serbia")
+Australia = subset(foreign_players_with_dups, Nationality == "Australia")
+USNigeria = subset(foreign_players_with_dups, Nationality == "United StatesNigeria")
+Spain = subset(foreign_players_with_dups, Nationality == "Spain")
+Brazil = subset(foreign_players_with_dups, Nationality == "Brazil")
+Croatia = subset(foreign_players_with_dups, Nationality == "Croatia")
+Argentina = subset(foreign_players_with_dups, Nationality == "Argentina")
+Lithuania = subset(foreign_players_with_dups, Nationality == "Lithuania")
+Germany = subset(foreign_players_with_dups, Nationality == "Germany")
+USPR = subset(foreign_players_with_dups, Nationality == "United StatesPuerto Rico")
+Slovenia = subset(foreign_players_with_dups, Nationality == "Slovenia")
+Turkey = subset(foreign_players_with_dups, Nationality == "Turkey")
+Senegal = subset(foreign_players_with_dups, Nationality == "Senegal")
+Russia = subset(foreign_players_with_dups, Nationality == "Russia")
+Ukraine = subset(foreign_players_with_dups, Nationality == "Ukraine")
+Latvia = subset(foreign_players_with_dups, Nationality == "Latvia")
+Georgia = subset(foreign_players_with_dups, Nationality == "Georgia")
+China = subset(foreign_players_with_dups, Nationality == "China")
+Nigeria = subset(foreign_players_with_dups, Nationality == "Nigeria")
+Italy = subset(foreign_players_with_dups, Nationality == "Italy")
+USGER = subset(foreign_players_with_dups, Nationality == "United StatesGermany")
+Greece = subset(foreign_players_with_dups, Nationality == "Greece")
+PRUS = subset(foreign_players_with_dups, Nationality == "Puerto RicoUnited States")
+USGRK = subset(foreign_players_with_dups, Nationality == "United StatesGreece")
+DR = subset(foreign_players_with_dups, Nationality == "Dominican Republic")
+DRC = subset(foreign_players_with_dups, Nationality == "Democratic Republic of the Congo")
+Czechia = subset(foreign_players_with_dups, Nationality == "Czech Republic")
+Cameroon = subset(foreign_players_with_dups, Nationality == "Cameroon")
+Main = rbind(Canada, France, Serbia, Australia, USNigeria, Spain, Brazil, Croatia, Argentina, Lithuania, Germany, USPR, Slovenia, Turkey, Senegal, Russia, Ukraine, Latvia, Georgia, China, Nigeria, Italy, USGER, Greece, PRUS, USGRK, DR, DRC, Czechia, Cameroon)
+```
+
+```{r, echo=FALSE, fig.align='center'}
+ggplot(data = Main) +
+      geom_histogram(mapping = aes(x = Year), binwidth = 1, color = "#000000", fill = "#FF9933") +
+      facet_wrap(~ Nationality, nrow = 6)
+```
+From this we can get a relative idea of what the international player distribution have been like over the past \~20 years. This figure lets the eye gravitate to the biggest distributions with the biggest changes, while passing over the smaller ones with little change. We can see that France and Canada in particular stand out, as expected given that they have by far the largest number of players in the league out of any foreign countries. Additionally, countries like Australia and Germany also catch the eye as they display an increasing trend as well. Yet once more attention is paid to searching the many histograms displayed smaller things stand out that prompt further questions. Chinese players were never a large group, but have become virtually nonexistent in the past decade. One must also notice that certain countries seem to have bi-modal distributions that raise unique questions of their own.
+
+```{r, echo=FALSE, fig.align='center'}
+ggplot(Canada, aes(Year)) +
+  geom_histogram(binwidth = 1, color = "#000000", fill = "#FF9933") +
+  labs(title = "Canada", y = "Players") +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplot(USNigeria, aes(Year)) +
+  geom_histogram(binwidth = 1, color = "#000000", fill = "#FF9933") +
+  labs(title = "US-Nigeria", y = "Players") +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplot(Croatia, aes(Year)) +
+  geom_histogram(binwidth = 1, color = "#000000", fill = "#FF9933") +
+  labs(title = "Croatia", y = "Players") +
+  theme(plot.title = element_text(hjust = 0.5))
+ggplot(China, aes(Year)) +
+  geom_histogram(binwidth = 1, color = "#000000", fill = "#FF9933") +
+  labs(title = "China", y = "Players") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+In these paired down examples one can more clearly see these trends. Such as with Canada, where growth starts to take off a few years after 2010. This could be due to a generation of kids growing up with watching the Toronto Raptors who had their inaugural season in 1995. That coupled with the establishment of big basketball stars in Canada and the growth of youth basketball could have combined to create this trend right around the 18th birthday of the Toronto Raptors franchise. Moving to China, a decreasing trend is present with just one Chinese player appearing in the NBA since 2012. This could be due to the rise of the Chinese Basketball association and the push to keep talent at home in an effort to boost viewership to eventually compete with the NBA. Another interesting distribution is that of Croatia, which appears bi-modal in shape. With a trough forming from the late 2000s until after 2015. This happens to roughly correspond to one generation, or about 18 years, after the upheaval of the fall of communism and the subsequent war of independence within Croatia.
+
+
+```{r, echo=FALSE, include=FALSE}
+all_playoff_lineups <- read_csv("AllPlayoffLineupsFrom04To22.csv")
+all_playoff_lineups_clean <-na.omit(all_playoff_lineups)
+
+ joined_data<- all_playoff_lineups_clean %>% pivot_longer(cols=c('PG', 'SG', 'SF','SF','PF','C'),
+                    names_to='Position',
+                    values_to='Player') 
+```
+
+
+```{r, echo=FALSE}
+join1 <- joined_data %>% inner_join(all_players_with_dups, by = "Player")
+
+```
+
+
+```{r, echo=FALSE}
+#detach(package:plyr)
+ForeignGrowth <- join1 %>% filter(!Nationality %in% c('United States'))
+
+b <-ForeignGrowth %>%
+  group_by(Year.x) %>%
+  summarise(n = n()) %>%
+  mutate(Freq = n/sum(n))
+
+
+c <- b %>% 
+  rename(
+    Years = Year.x,
+    "International players" = n
+    )
+
+```
+
+```{r, echo=FALSE,fig.align='center', warning=FALSE}
+
+
+ggplot(c, aes(Years, `International players`)) +
+  geom_line(color="steelblue", size = 1) +
+  geom_point(color="darkred")+
+  labs(title="Foreign Players on NBA Trend")+
+  theme_minimal()
+
+
+```
+
+The utilization of international players in NBA playoff lineups were analyzed. To pursue the analysis, first, the lineups dataset with the players dataset were joined according to the player name. Then, the number of international players used in lineups between the years 2004 and 2022 were investigated. It was discovered that international players were being utilized more in the 2010s than 2000s. There was a sharp decrease after 2015 which might be due to the fact that COVID-19 was affecting every field, including sports, or the policies regarding international visitors might have changed and become more strict.
+
+```{r, echo=FALSE}
+
+join1_poss = arrange(join1, desc(Poss))
+
+
+d <- join1_poss %>% 
+  rename(
+    Possession = Poss
+    )
+
+```
+
+```{r, echo=FALSE}
+
+a <-  d
+
+for(i in 1:nrow(a)) {
+  if (a$Nationality[i] == "United States") {
+  a$Nationality[i] = "US players"
+  }else
+  if (a$Nationality[i] != "United States") {
+  a$Nationality[i] = "International Players"
+  }
+}
+
+
+
+```
+
+```{r, echo=FALSE,fig.align='center'}
+ggplot(a, 
+       aes(x = Nationality, 
+           y = Possession)) +
+  geom_point() 
+
+```
+
+
+```{r, include=FALSE}
+# Find the mean of each group
+library(plyr)
+cdat <- ddply(a, "Nationality", summarise, Poss.mean=mean(Possession))
+```
+
+
+```{r,echo=FALSE,fig.align='center'}
+# Overlaid histograms with means
+ggplot(a, aes(x=Possession, fill=Nationality)) +
+    geom_histogram(binwidth=35, alpha=.5, position="identity") +
+    geom_vline(data=cdat, aes(xintercept=Poss.mean,  colour=Nationality),
+               linetype="dashed", size=1)
+
+# Density plots with means
+ggplot(a, aes(x=Possession, colour=Nationality)) +
+    geom_density() +
+    geom_vline(data=cdat, aes(xintercept=Poss.mean,  colour=Nationality),
+               linetype="dashed", size=1)
+
+#Density plots with semi-transparent fill
+ggplot(a, aes(x=Possession, fill=Nationality)) + 
+  geom_density(alpha=.3)
+```
+
+```{r,echo=FALSE,fig.align='center'}
+ggplot(a, aes(x=Nationality, y=Possession, fill=Nationality)) + geom_boxplot()
+
+```
+
+
+Next, it was investigated if the most used lineups included international players. It was decided that possession would be a great indicator of it. Thus, the dataset was arranged by decreasing possession and then histograms, density plots, and boxplots were created. Even from the geom_point graph, it can be deduced that in teams with the highest possession, US players are utilized more than international players. Furthermore, density plots and histograms indicate that international players are utilized more in teams with lower possession than in teams with higher possession. However, it can be sees from the boxplot that the mean of possession of national players and international players are close to each other. US players' boxplot was right-skewed meaning they had more players close to higher possessions.
+
+
+
+# CONCLUSION
+In terms of efficiency differential, we found that a model that included a point guard’s level of experience and an assortment of analytical metrics was best able to explain this statistic. The most important covariates are offensive points per possession, defensive effective field goal percentage, defensive turnover rate, defensive offensive rebound allowed, and its point guard’s experience level. In the real world, this is very important, as analysts, coaches, and general managers can use this model to scout players whose game best maximizes these metrics in order to increase their team’s efficiency differential which leads to more games won for the team. In order to continue this work, it would be beneficial to experiment with this data on a game-to-game basis. With this specific type of data, a binary variable could be added in regards to whether a team won a game or not based on these statistics and use this in combination with the data used by our group to see how efficiency differential influences whether a team wins a game or not. As earlier mentioned, this would be greatly desired by coaches, scouts, and general managers in order to make changes to their team that could maximize efficiency differential which in turn could lead to greater team success and fan satisfaction.
+
+An increasingly important question in the modern data driven NBA is how to find and secure the best talent for the lowest cost. To that end international players have become increasingly important as a high-risk high-reward bet for analytics minded teams. As the NBA has become more international, its player base has followed suit. With particular countries such as Canada and France supplying quality players in increasing numbers, or United States diaspora communities from countries such as Nigeria. Yet one can also see the mark of geopolitical turmoil and the rise of competitive leagues in the data of Croatia and China respectively. This intersection of player origins and world events will become very important as teams try to get scouts placed in the right countries to watch and develop talent before their rivals. Teams will want to increase staff capable of looking beyond just the scouting numbers to stay years ahead of the trends of developing foreign talent. To fully understand the utilization of foreign players, one can analyze the extent of their use in lineups. From the analysis, it was discovered that the usage of international players has increased since 2004, but experienced a dramatic dropdown after 2015.  This might be the result of political actions or COVID-19. Later on, possession was used to investigate the difference between national players and foreign players difference. Even though, national players were preferred in the teams with higher possessions, on average international players and national players were playing in the teams with a similar amount of possessions which shows that international players are being used extensively in the NBA.
+
+
+
+
+
+
